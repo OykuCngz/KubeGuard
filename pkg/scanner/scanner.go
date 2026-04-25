@@ -244,6 +244,7 @@ func renderHTML(issues []AuditIssue) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KubeGuard Audit Report</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary: #1a73e8;
@@ -258,10 +259,12 @@ func renderHTML(issues []AuditIssue) {
         .container { max-width: 1200px; margin: 0 auto; }
         header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 2px solid #e8eaed; padding-bottom: 20px; }
         h1 { margin: 0; color: var(--primary); font-size: 32px; }
-        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
-        .card { background: var(--card); padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(60,64,67,0.3); text-align: center; }
-        .card h3 { margin: 0; font-size: 14px; text-transform: uppercase; color: #70757a; }
-        .card p { margin: 10px 0 0; font-size: 36px; font-weight: 700; }
+        .dashboard { display: grid; grid-template-columns: 1fr 2fr; gap: 30px; margin-bottom: 40px; align-items: start; }
+        .card { background: var(--card); padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(60,64,67,0.3); }
+        .summary-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .stat-box { padding: 15px; border-radius: 8px; text-align: center; background: #f1f3f4; }
+        .stat-box h4 { margin: 0; font-size: 12px; color: #5f6368; text-transform: uppercase; }
+        .stat-box p { margin: 5px 0 0; font-size: 24px; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(60,64,67,0.3); }
         th { background: #f1f3f4; padding: 16px; text-align: left; font-size: 14px; text-transform: uppercase; color: #5f6368; }
         td { padding: 16px; border-bottom: 1px solid #e8eaed; font-size: 14px; }
@@ -270,6 +273,7 @@ func renderHTML(issues []AuditIssue) {
         .sev-Low { color: var(--low); font-weight: 600; }
         .remediation { font-style: italic; color: #5f6368; font-size: 13px; }
         .timestamp { color: #70757a; font-size: 14px; }
+        .chart-container { position: relative; height: 250px; width: 100%; }
     </style>
 </head>
 <body>
@@ -279,11 +283,40 @@ func renderHTML(issues []AuditIssue) {
                 <h1>🛡️ KubeGuard Audit Report</h1>
                 <p class="timestamp">Generated on {{.Timestamp}}</p>
             </div>
-            <div class="card" style="padding: 10px 20px;">
-                <h3>Total Issues</h3>
-                <p style="font-size: 24px;">{{len .Issues}}</p>
+            <div class="timestamp">
+                <strong>Status:</strong> <span style="color: var(--primary)">Professional Audit Complete</span>
             </div>
         </header>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>Severity Distribution</h3>
+                <div class="chart-container">
+                    <canvas id="severityChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Executive Summary</h3>
+                <div class="summary-stats">
+                    <div class="stat-box" style="border-left: 5px solid var(--primary)">
+                        <h4>Total Issues</h4>
+                        <p>{{len .Issues}}</p>
+                    </div>
+                    <div class="stat-box" style="border-left: 5px solid var(--high)">
+                        <h4>High Severity</h4>
+                        <p>{{.HighCount}}</p>
+                    </div>
+                    <div class="stat-box" style="border-left: 5px solid var(--medium)">
+                        <h4>Medium Severity</h4>
+                        <p>{{.MediumCount}}</p>
+                    </div>
+                    <div class="stat-box" style="border-left: 5px solid var(--low)">
+                        <h4>Low Severity</h4>
+                        <p>{{.LowCount}}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <table>
             <thead>
@@ -310,17 +343,58 @@ func renderHTML(issues []AuditIssue) {
             </tbody>
         </table>
     </div>
+
+    <script>
+        const ctx = document.getElementById('severityChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['High', 'Medium', 'Low'],
+                datasets: [{
+                    data: [{{.HighCount}}, {{.MediumCount}}, {{.LowCount}}],
+                    backgroundColor: ['#d93025', '#f9ab00', '#188038'],
+                    hoverOffset: 4,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'bottom' }
+                },
+                cutout: '70%'
+            }
+        });
+    </script>
 </body>
 </html>
 `
 	type ReportData struct {
-		Timestamp string
-		Issues    []AuditIssue
+		Timestamp   string
+		Issues      []AuditIssue
+		HighCount   int
+		MediumCount int
+		LowCount    int
+	}
+
+	high, med, low := 0, 0, 0
+	for _, issue := range issues {
+		switch issue.Severity {
+		case "High":
+			high++
+		case "Medium":
+			med++
+		case "Low":
+			low++
+		}
 	}
 
 	data := ReportData{
-		Timestamp: time.Now().Format("Jan 02, 2026 15:04:05"),
-		Issues:    issues,
+		Timestamp:   time.Now().Format("Jan 02, 2026 15:04:05"),
+		Issues:      issues,
+		HighCount:   high,
+		MediumCount: med,
+		LowCount:    low,
 	}
 
 	fileName := "kubeguard-report.html"
@@ -338,8 +412,7 @@ func renderHTML(issues []AuditIssue) {
 		return
 	}
 
-	color.Green("✅ HTML report generated successfully: %s", fileName)
-	fmt.Printf("Open this file in your browser to view the report.\n")
+	color.Green("✅ HTML report with charts generated: %s", fileName)
 }
 
 func truncate(s string, n int) string {
