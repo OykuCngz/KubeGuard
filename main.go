@@ -22,6 +22,7 @@ Built for Google-scale infrastructure auditing.`,
 var (
 	namespace string
 	jsonOut   bool
+	htmlOut   bool
 )
 
 var auditCmd = &cobra.Command{
@@ -29,13 +30,14 @@ var auditCmd = &cobra.Command{
 	Short: "Audit the current Kubernetes cluster",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("🔍 Auditing cluster...")
-		scanner.RunAudit(namespace, jsonOut)
+		scanner.RunAudit(namespace, jsonOut, htmlOut)
 	},
 }
 
 func main() {
 	auditCmd.Flags().StringVarP(&namespace, "namespace", "n", "", "Specific namespace to audit (default: all)")
 	auditCmd.Flags().BoolVarP(&jsonOut, "json", "j", false, "Output results in JSON format")
+	auditCmd.Flags().BoolVarP(&htmlOut, "html", "H", false, "Generate a beautiful HTML report")
 	
 	rootCmd.AddCommand(auditCmd)
 	if err := rootCmd.Execute(); err != nil {

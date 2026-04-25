@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"os"
 	"path/filepath"
+	"time"
 
 	"text/tabwriter"
 
@@ -27,7 +29,7 @@ type AuditIssue struct {
 }
 
 // RunAudit initializes the K8s client and starts the scanning process
-func RunAudit(ns string, jsonOut bool) {
+func RunAudit(ns string, jsonOut bool, htmlOut bool) {
 	// Setup K8s client
 	homeDir, _ := os.UserHomeDir()
 	kubeconfig := filepath.Join(homeDir, ".kube", "config")
@@ -35,12 +37,12 @@ func RunAudit(ns string, jsonOut bool) {
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		color.Yellow("💡 No active cluster found. Running in DEMO MODE for Google Portfolio showcase...")
-		runDemoMode(jsonOut)
+		runDemoMode(jsonOut, htmlOut)
 		return
 	}
 
 	var issues []AuditIssue
-	if !jsonOut {
+	if !jsonOut && !htmlOut {
 		color.Cyan("🚀 Connected to cluster. Performing professional audit on namespace: %s", func() string {
 			if ns == "" {
 				return "all"
@@ -58,12 +60,14 @@ func RunAudit(ns string, jsonOut bool) {
 	// 3. Print Results
 	if jsonOut {
 		renderJSON(issues)
+	} else if htmlOut {
+		renderHTML(issues)
 	} else {
 		renderTable(issues)
 	}
 }
 
-func runDemoMode(jsonOut bool) {
+func runDemoMode(jsonOut bool, htmlOut bool) {
 	mockIssues := []AuditIssue{
 		{Category: "Security", Resource: "Pod", Name: "default/nginx-app", Message: "Privileged container detected", Severity: "High", Remediation: "Set allowPrivilegeEscalation: false in securityContext."},
 		{Category: "Efficiency", Resource: "Deployment", Name: "prod/api-server", Message: "No CPU/Memory limits defined", Severity: "High", Remediation: "Add resources.limits to the container spec."},
@@ -73,6 +77,8 @@ func runDemoMode(jsonOut bool) {
 	}
 	if jsonOut {
 		renderJSON(mockIssues)
+	} else if htmlOut {
+		renderHTML(mockIssues)
 	} else {
 		renderTable(mockIssues)
 	}
@@ -227,6 +233,113 @@ func renderJSON(issues []AuditIssue) {
 		return
 	}
 	fmt.Println(string(data))
+}
+
+func renderHTML(issues []AuditIssue) {
+	const htmlTmpl = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KubeGuard Audit Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --bg: #f8f9fa;
+            --card: #ffffff;
+            --high: #d93025;
+            --medium: #f9ab00;
+            --low: #188038;
+            --text: #3c4043;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 40px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 2px solid #e8eaed; padding-bottom: 20px; }
+        h1 { margin: 0; color: var(--primary); font-size: 32px; }
+        .summary-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 40px; }
+        .card { background: var(--card); padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(60,64,67,0.3); text-align: center; }
+        .card h3 { margin: 0; font-size: 14px; text-transform: uppercase; color: #70757a; }
+        .card p { margin: 10px 0 0; font-size: 36px; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(60,64,67,0.3); }
+        th { background: #f1f3f4; padding: 16px; text-align: left; font-size: 14px; text-transform: uppercase; color: #5f6368; }
+        td { padding: 16px; border-bottom: 1px solid #e8eaed; font-size: 14px; }
+        .sev-High { color: var(--high); font-weight: 600; }
+        .sev-Medium { color: var(--medium); font-weight: 600; }
+        .sev-Low { color: var(--low); font-weight: 600; }
+        .remediation { font-style: italic; color: #5f6368; font-size: 13px; }
+        .timestamp { color: #70757a; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🛡️ KubeGuard Audit Report</h1>
+                <p class="timestamp">Generated on {{.Timestamp}}</p>
+            </div>
+            <div class="card" style="padding: 10px 20px;">
+                <h3>Total Issues</h3>
+                <p style="font-size: 24px;">{{len .Issues}}</p>
+            </div>
+        </header>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Resource</th>
+                    <th>Name</th>
+                    <th>Message</th>
+                    <th>Severity</th>
+                    <th>Remediation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Issues}}
+                <tr>
+                    <td>{{.Category}}</td>
+                    <td>{{.Resource}}</td>
+                    <td><code>{{.Name}}</code></td>
+                    <td>{{.Message}}</td>
+                    <td><span class="sev-{{.Severity}}">{{.Severity}}</span></td>
+                    <td class="remediation">{{.Remediation}}</td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>
+`
+	type ReportData struct {
+		Timestamp string
+		Issues    []AuditIssue
+	}
+
+	data := ReportData{
+		Timestamp: time.Now().Format("Jan 02, 2026 15:04:05"),
+		Issues:    issues,
+	}
+
+	fileName := "kubeguard-report.html"
+	f, err := os.Create(fileName)
+	if err != nil {
+		fmt.Printf("Error creating HTML file: %v\n", err)
+		return
+	}
+	defer f.Close()
+
+	tmpl := template.Must(template.New("report").Parse(htmlTmpl))
+	err = tmpl.Execute(f, data)
+	if err != nil {
+		fmt.Printf("Error executing template: %v\n", err)
+		return
+	}
+
+	color.Green("✅ HTML report generated successfully: %s", fileName)
+	fmt.Printf("Open this file in your browser to view the report.\n")
 }
 
 func truncate(s string, n int) string {
