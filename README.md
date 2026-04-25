@@ -43,7 +43,7 @@ go run main.go audit --json
 - [Client-Go](https://github.com/kubernetes/client-go) - Official Kubernetes Go client.
 
 ## 👨‍💻 Author
-- Öykü Cengiz - [Your LinkedIn](www.linkedin.com/in/öykü-cengiz)
+- Öykü Cengiz - [www.linkedin.com/in/öykü-cengiz](www.linkedin.com/in/öykü-cengiz)
 
 ---
 *Developed with focus on Google Warsaw Engineering Standards.*
