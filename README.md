@@ -46,4 +46,4 @@ go run main.go audit --json
 - Öykü Cengiz - [www.linkedin.com/in/öykü-cengiz](www.linkedin.com/in/öykü-cengiz)
 
 ---
-*Developed with focus on Google Warsaw Engineering Standards.*
+
